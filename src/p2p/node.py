@@ -1,10 +1,11 @@
 from flask import Flask, request, jsonify
 from src.core.chain import Chain
 from src.core.transaction import Transaction
-from src.core.validation import Validator
+from src.core.validator import Validator
 from src.p2p.peers import Peers
 from src.p2p.broadcast import Broadcast
 from src.p2p.sync import Sync
+from src.core.block import Block
 
 
 class Node:
@@ -39,7 +40,11 @@ class Node:
         @self.app.route("/block", methods=["POST"])
         def post_block():
             data = request.get_json()
-            # deserialization handled in next branch
+            block = Block.from_dict(data)
+            if not Validator.validate_block(block, self.chain.latest()):
+                return jsonify({"error": "invalid block"}), 400
+            self.chain.add_block(block)
+            self.broadcast.send_block(block, self.peers.all())
             return jsonify({"status": "ok"}), 200
 
         @self.app.route("/chain", methods=["GET"])
