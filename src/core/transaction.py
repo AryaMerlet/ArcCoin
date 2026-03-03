@@ -1,5 +1,6 @@
 import uuid
 from src.crypto.hash import sha256
+from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
 
 
 class Transaction:
@@ -9,8 +10,9 @@ class Transaction:
         recipient: str,
         amount: float,
         nonce: int,
+        sender_public_key: EllipticCurvePublicKey,
         tx_type: str = "payment",
-        payload: dict = None
+        payload: dict = None,
     ):
         self.tx_id = str(uuid.uuid4())
         self.sender = sender
@@ -20,6 +22,8 @@ class Transaction:
         self.tx_type = tx_type
         self.payload = payload or {}
         self.signature = None
+        self.sender_public_key = sender_public_key
+
 
     def hash(self) -> str:
         return sha256({
