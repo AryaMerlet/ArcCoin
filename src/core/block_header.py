@@ -38,3 +38,14 @@ class BlockHeader:
             "timestamp": self.timestamp,
             "nonce": self.nonce
         }
+
+    @staticmethod
+    def from_dict(data: dict) -> "BlockHeader":
+        return BlockHeader(
+            index=data["index"],
+            prev_hash=data["prev_hash"],
+            merkle_root=data["merkle_root"],
+            difficulty=data["difficulty"],
+            timestamp=data["timestamp"],
+            nonce=data["nonce"]
+        )
