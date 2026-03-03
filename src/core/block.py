@@ -18,3 +18,9 @@ class Block:
             "header": self.header.to_dict(),
             "transactions": [tx.to_dict() for tx in self.transactions]
         }
+
+    @staticmethod
+    def from_dict(data: dict) -> "Block":
+        header = BlockHeader.from_dict(data["header"])
+        transactions = [Transaction.from_dict(tx) for tx in data["transactions"]]
+        return Block(header, transactions)
