@@ -33,3 +33,11 @@ class Chain:
             "length": self.length(),
             "blocks": [block.to_dict() for block in self.blocks]
         }
+
+    @staticmethod
+    def from_dict(data: dict) -> "Chain":
+        chain = Chain()
+        for block_data in data["blocks"]:
+            block = Block.from_dict(block_data)
+            chain.add_block(block)
+        return chain
