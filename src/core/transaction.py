@@ -47,3 +47,18 @@ class Transaction:
             "payload": self.payload,
             "signature": self.signature.hex() if self.signature else None
         }
+
+    @staticmethod
+    def from_dict(data: dict) -> "Transaction":
+        tx = Transaction(
+            sender=data["sender"],
+            recipient=data["recipient"],
+            amount=data["amount"],
+            nonce=data["nonce"],
+            sender_public_key=data["sender_public_key"],
+            tx_type=data["tx_type"],
+            payload=data["payload"]
+        )
+        tx.tx_id = data["tx_id"]
+        tx.signature = bytes.fromhex(data["signature"]) if data["signature"] else None
+        return tx
