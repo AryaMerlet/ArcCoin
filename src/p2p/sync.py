@@ -1,5 +1,6 @@
 import requests
-from src.core.validation import Validator
+from src.core.validator import Validator
+from src.core.chain import Chain
 
 
 class Sync:
@@ -16,7 +17,12 @@ class Sync:
             return None
 
     def resolve(self, peers: list[str]) -> bool:
-        new_chain = Validator.select_chain(self.chain, peers)
+        for url in peers:
+            data = self.fetch_chain(url)
+            if data is None:
+                continue
+        remote_chain = Chain.from_dict(data)
+        new_chain = Validator.select_chain(self.chain, remote_chain)
         if new_chain != self.chain:
             self.chain = new_chain
             return True
