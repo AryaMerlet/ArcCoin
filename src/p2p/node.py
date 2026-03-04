@@ -30,6 +30,7 @@ class Node:
                 nonce=data["nonce"],
                 sender_public_key=public_key_from_bytes(bytes.fromhex(data["sender_public_key"])),
             )
+            tx.tx_id = data["tx_id"]
             tx.signature = bytes.fromhex(data["signature"]) if data["signature"] else None
             if not Validator.validate_transaction(tx, self.chain.state):
                 return jsonify({"error": "invalid transaction"}), 400
@@ -60,6 +61,40 @@ class Node:
         @self.app.route("/peers", methods=["GET"])
         def get_peers():
             return jsonify({"peers": self.peers.all()}), 200
+
+        @self.app.route("/seed", methods=["POST"])
+        def seed_balance():
+            data = request.get_json()
+            self.chain.state.balances[data["address"]] = data["amount"]
+            return jsonify({"status": "ok"}), 200
+
+        @self.app.route("/mempool", methods=["GET"])
+        def get_mempool():
+            return jsonify({"pending": [tx.to_dict() for tx in self.chain.mempool.pending]}), 200
+
+        @self.app.route("/mine", methods=["POST"])
+        def mine():
+            txs = self.chain.mempool.get_valid_txs()
+            if not txs:
+                return jsonify({"error": "no transactions to mine"}), 400
+            from src.crypto.hash import merkle_root
+            from src.core.block_header import BlockHeader
+            from src.core.block import Block
+            prev = self.chain.latest()
+            prev_hash = prev.header.hash() if prev else "0" * 64
+            index = self.chain.length()
+            m_root = merkle_root([tx.hash() for tx in txs])
+            header = BlockHeader(
+                index=index,
+                prev_hash=prev_hash,
+                merkle_root=m_root,
+                difficulty=2
+            )
+            block = Block(header, txs)
+            block.mine()
+            self.chain.add_block(block)
+            self.broadcast.send_block(block, self.peers.all())
+            return jsonify({"status": "mined", "block": block.to_dict()}), 200
 
     def start(self):
         self.sync.resolve(self.peers.all())

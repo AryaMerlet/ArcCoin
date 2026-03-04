@@ -1,4 +1,5 @@
 import uuid
+from cryptography.hazmat.primitives import serialization
 from src.crypto.hash import sha256
 from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
 
@@ -45,7 +46,11 @@ class Transaction:
             "nonce": self.nonce,
             "tx_type": self.tx_type,
             "payload": self.payload,
-            "signature": self.signature.hex() if self.signature else None
+            "signature": self.signature.hex() if self.signature else None,
+            "sender_public_key": self.sender_public_key.public_bytes(
+                encoding=serialization.Encoding.X962,
+                format=serialization.PublicFormat.UncompressedPoint
+            ).hex() if not isinstance(self.sender_public_key, str) else self.sender_public_key,
         }
 
     @staticmethod

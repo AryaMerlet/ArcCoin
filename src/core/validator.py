@@ -10,12 +10,19 @@ class Validator:
     @staticmethod
     def validate_transaction(tx: Transaction, state: State) -> bool:
         if tx.signature is None:
+            print("DEBUG: no signature")
             return False
         if not verify(tx.sender_public_key, tx.hash(), tx.signature):
+            print("DEBUG: invalid signature")
+
             return False
         if state.get_balance(tx.sender) < tx.amount:
+            print(f"DEBUG: insufficient balance: {state.get_balance(tx.sender)}")
+
             return False
         if state.get_nonce(tx.sender) != tx.nonce:
+            print(f"DEBUG: wrong nonce: expected {state.get_nonce(tx.sender)}, got {tx.nonce}")
+
             return False
         return True
 
