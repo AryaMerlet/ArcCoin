@@ -1,14 +1,15 @@
 import hashlib
 from cryptography.hazmat.primitives.asymmetric.ec import (
-    generate_private_key,
+    generate_private_key as _generate_ec_key,
     SECP256K1,
     EllipticCurvePrivateKey
 )
+
 from cryptography.hazmat.primitives import serialization
 
 
 def generate_private_key() -> EllipticCurvePrivateKey:
-    return generate_private_key(SECP256K1())
+    return _generate_ec_key(SECP256K1())
 
 
 def derive_public_key(private_key: EllipticCurvePrivateKey) -> bytes:
