@@ -46,3 +46,22 @@ def test_transaction_to_dict():
     d = tx.to_dict()
     assert d["sender"] == address
     assert d["amount"] == 10.0
+
+def test_from_dict():
+    private_key = keys.generate_private_key()
+    public_key = keys.derive_public_key(private_key)
+    address = keys.derive_address(public_key)
+    tx = Transaction(
+        sender=address,
+        recipient="ARCrecipient",
+        amount=10.0,
+        nonce=0,
+        sender_public_key=private_key.public_key()
+    )
+    tx.signature = signatures.sign(private_key, tx.hash())
+    d = tx.to_dict()
+    d["sender_public_key"] = private_key.public_key()
+    restored = Transaction.from_dict(d)
+    assert restored.sender == tx.sender
+    assert restored.amount == tx.amount
+    assert restored.nonce == tx.nonce
