@@ -15,7 +15,7 @@ tests/              # all unit tests
 
 ## Project Structure
 
-![Blockchain Key Management-2026-03-04-082800.png](../../Documents/COURS/BLOCKCHAIN%26SMART_CONTRACT/Blockchain%20Key%20Management-2026-03-04-082800.png)
+![UML Class Diagram](docs/blockchain_uml.png)
 
 ## Setup
 ```bash
