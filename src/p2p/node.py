@@ -6,7 +6,7 @@ from src.p2p.peers import Peers
 from src.p2p.broadcast import Broadcast
 from src.p2p.sync import Sync
 from src.core.block import Block
-
+from src.crypto.keys import public_key_from_bytes
 
 class Node:
     def __init__(self, host: str, port: int):
@@ -28,9 +28,9 @@ class Node:
                 recipient=data["recipient"],
                 amount=data["amount"],
                 nonce=data["nonce"],
-                sender_public_key=data["sender_public_key"],
+                sender_public_key=public_key_from_bytes(bytes.fromhex(data["sender_public_key"])),
             )
-            tx.signature = bytes.fromhex(data["signature"])
+            tx.signature = bytes.fromhex(data["signature"]) if data["signature"] else None
             if not Validator.validate_transaction(tx, self.chain.state):
                 return jsonify({"error": "invalid transaction"}), 400
             self.chain.add_transaction(tx)

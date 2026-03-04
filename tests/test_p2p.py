@@ -1,4 +1,5 @@
 import requests
+import pytest
 from unittest.mock import patch, MagicMock
 from src.p2p.peers import Peers
 from src.p2p.broadcast import Broadcast
@@ -6,6 +7,9 @@ from src.p2p.sync import Sync
 from src.core.chain import Chain
 from src.core.block import Block
 from src.core.block_header import BlockHeader
+from src.p2p.node import Node
+from src.crypto import keys, signatures
+from cryptography.hazmat.primitives import serialization
 
 
 # ── PEERS ────────────────────────────────────────────
@@ -202,3 +206,104 @@ def test_sync_resolve_fetch_returns_none():
     with patch.object(sync, "fetch_chain", return_value=None):
         result = sync.resolve(["http://127.0.0.1:5001"])
     assert result is False
+
+
+@pytest.fixture
+def client():
+    node = Node("127.0.0.1", 5001)
+    node.app.config["TESTING"] = True
+    return node.app.test_client(), node
+
+
+def test_get_chain(client):
+    app_client, node = client
+    response = app_client.get("/chain")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert "blocks" in data
+
+
+def test_post_peers(client):
+    app_client, node = client
+    response = app_client.post("/peers", json={"url": "http://127.0.0.1:5002"})
+    assert response.status_code == 200
+
+
+def test_get_peers(client):
+    app_client, node = client
+    app_client.post("/peers", json={"url": "http://127.0.0.1:5002"})
+    response = app_client.get("/peers")
+    assert response.status_code == 200
+    assert "http://127.0.0.1:5002" in response.get_json()["peers"]
+
+
+def test_post_valid_transaction(client):
+    app_client, node = client
+    private_key = keys.generate_private_key()
+    public_key = keys.derive_public_key(private_key)
+    address = keys.derive_address(public_key)
+    node.chain.state.balances[address] = 100.0
+    from src.core.transaction import Transaction
+    tx = Transaction(
+        sender=address,
+        recipient="ARCbob",
+        amount=10.0,
+        nonce=0,
+        sender_public_key=private_key.public_key()
+    )
+    tx.signature = signatures.sign(private_key, tx.hash())
+    data = tx.to_dict()
+    data["sender_public_key"] = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.X962,
+        format=serialization.PublicFormat.UncompressedPoint
+    ).hex()
+    with patch("src.p2p.node.Broadcast.send_tx"):
+        response = app_client.post("/transaction", json=data)
+    assert response.status_code == 200
+
+
+def test_post_invalid_transaction(client):
+    app_client, node = client
+    private_key = keys.generate_private_key()
+    public_key = keys.derive_public_key(private_key)
+    address = keys.derive_address(public_key)
+    from src.core.transaction import Transaction
+    tx = Transaction(
+        sender=address,
+        recipient="ARCbob",
+        amount=10.0,
+        nonce=0,
+        sender_public_key=private_key.public_key()
+    )
+    data = tx.to_dict()
+    data["sender_public_key"] = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.X962,
+        format=serialization.PublicFormat.UncompressedPoint
+    ).hex()
+    response = app_client.post("/transaction", json=data)
+    assert response.status_code == 400
+
+
+def test_post_valid_block(client):
+    app_client, node = client
+    header = BlockHeader(index=0, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=1)
+    block = Block(header, [])
+    block.mine()
+    with patch("src.p2p.node.Broadcast.send_block"):
+        response = app_client.post("/block", json=block.to_dict())
+    assert response.status_code == 200
+
+
+def test_post_invalid_block(client):
+    app_client, node = client
+    # add a first valid block
+    header1 = BlockHeader(index=0, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=1)
+    block1 = Block(header1, [])
+    block1.mine()
+    node.chain.add_block(block1)
+    # second block with wrong prev_hash
+    header2 = BlockHeader(index=1, prev_hash="wronghash", merkle_root="0" * 64, difficulty=1)
+    block2 = Block(header2, [])
+    block2.mine()
+    response = app_client.post("/block", json=block2.to_dict())
+    assert response.status_code == 400
