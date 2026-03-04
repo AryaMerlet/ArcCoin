@@ -92,3 +92,31 @@ def test_transfer_unknown_function():
     state = ContractState()
     with pytest.raises(ValueError):
         run_transfer("unknown", {}, "ARCcaller", state, "ARC003")
+
+def test_call_nonexistent_contract():
+    engine = ContractEngine()
+    with pytest.raises(ValueError):
+        engine.call("ARC999", "increment", {}, "ARCcaller")
+
+
+def test_call_unknown_contract_type():
+    engine = ContractEngine()
+    engine.contracts["ARC999"] = "unknown_type"
+    with pytest.raises(ValueError):
+        engine.call("ARC999", "increment", {}, "ARCcaller")
+
+
+def test_call_transfer_contract():
+    engine = ContractEngine()
+    engine.deploy("ARC004", "transfer")
+    engine.state.set("ARC004", "owner", "ARCowner")
+    result = engine.call("ARC004", "transfer", {"recipient": "ARCbob"}, "ARCowner")
+    assert result is True
+
+
+def test_get_state():
+    engine = ContractEngine()
+    engine.deploy("ARC005", "counter")
+    engine.call("ARC005", "increment", {}, "ARCcaller")
+    state = engine.get_state("ARC005")
+    assert state["count"] == 1

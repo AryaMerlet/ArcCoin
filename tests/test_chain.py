@@ -67,3 +67,63 @@ def test_state_updates_after_block():
 
     assert chain.state.get_balance(sender) == 90.0
     assert chain.state.get_balance("ARCrecipient") == 10.0
+
+def make_block(index, prev_hash, difficulty=1):
+    header = BlockHeader(index=index, prev_hash=prev_hash, merkle_root="0" * 64, difficulty=difficulty)
+    block = Block(header, [])
+    block.mine()
+    return block
+
+
+def test_add_transaction():
+    chain = Chain()
+    private_key = keys.generate_private_key()
+    address = keys.derive_address(keys.derive_public_key(private_key))
+    tx = Transaction(
+        sender=address,
+        recipient="ARCbob",
+        amount=10.0,
+        nonce=0,
+        sender_public_key=private_key.public_key()
+    )
+    assert chain.add_transaction(tx) is True
+
+
+def test_latest_block():
+    chain = Chain()
+    block = make_block(0, "0" * 64)
+    chain.add_block(block)
+    assert chain.latest() == block
+
+
+def test_latest_empty_chain():
+    chain = Chain()
+    assert chain.latest() is None
+
+
+def test_select_longer_chain():
+    chain_a = Chain()
+    chain_b = Chain()
+    chain_a.add_block(make_block(0, "0" * 64))
+    chain_a.add_block(make_block(1, "0" * 64))
+    chain_b.add_block(make_block(0, "0" * 64))
+    assert chain_a.select(chain_b) == chain_a
+
+
+def test_to_dict():
+    chain = Chain()
+    chain.add_block(make_block(0, "0" * 64))
+    d = chain.to_dict()
+    assert d["length"] == 1
+    assert len(d["blocks"]) == 1
+
+
+def test_from_dict():
+    chain = Chain()
+    prev_hash = "0" * 64
+    for i in range(2):
+        block = make_block(i, prev_hash)
+        prev_hash = block.header.hash()
+        chain.add_block(block)
+    restored = Chain.from_dict(chain.to_dict())
+    assert restored.length() == 2
