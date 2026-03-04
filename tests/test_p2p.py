@@ -307,3 +307,10 @@ def test_post_invalid_block(client):
     block2.mine()
     response = app_client.post("/block", json=block2.to_dict())
     assert response.status_code == 400
+
+def test_node_start(client):
+    app_client, node = client
+    with patch.object(node.app, "run") as mock_run:
+        with patch.object(node.sync, "resolve"):
+            node.start()
+            assert mock_run.called
