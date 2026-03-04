@@ -1,4 +1,7 @@
+import pytest
 from src.contracts.engine import ContractEngine
+from src.contracts.execution import run_counter, run_escrow, run_transfer
+from src.contracts.state import ContractState
 
 
 def test_counter_increment():
@@ -38,3 +41,54 @@ def test_deploy_twice_fails():
     engine.deploy("ARC003", "counter")
     result = engine.deploy("ARC003", "counter")
     assert result is False
+
+def test_counter_unknown_function():
+    state = ContractState()
+    with pytest.raises(ValueError):
+        run_counter("unknown", {}, "ARCcaller", state, "ARC001")
+
+
+def test_escrow_release_not_locked():
+    state = ContractState()
+    result = run_escrow("release", {"recipient": "ARCbob"}, "ARCsender", state, "ARC002")
+    assert result is False
+
+
+def test_escrow_release_wrong_caller():
+    state = ContractState()
+    run_escrow("deposit", {"amount": 100}, "ARCsender", state, "ARC002")
+    result = run_escrow("release", {"recipient": "ARCbob"}, "ARCwrong", state, "ARC002")
+    assert result is False
+
+
+def test_escrow_refund_wrong_caller():
+    state = ContractState()
+    run_escrow("deposit", {"amount": 100}, "ARCsender", state, "ARC002")
+    result = run_escrow("refund", {}, "ARCwrong", state, "ARC002")
+    assert result is False
+
+
+def test_escrow_unknown_function():
+    state = ContractState()
+    with pytest.raises(ValueError):
+        run_escrow("unknown", {}, "ARCcaller", state, "ARC002")
+
+
+def test_transfer_wrong_owner():
+    state = ContractState()
+    state.set("ARC003", "owner", "ARCowner")
+    result = run_transfer("transfer", {"recipient": "ARCbob"}, "ARCwrong", state, "ARC003")
+    assert result is False
+
+
+def test_transfer_success():
+    state = ContractState()
+    state.set("ARC003", "owner", "ARCowner")
+    result = run_transfer("transfer", {"recipient": "ARCbob"}, "ARCowner", state, "ARC003")
+    assert result is True
+
+
+def test_transfer_unknown_function():
+    state = ContractState()
+    with pytest.raises(ValueError):
+        run_transfer("unknown", {}, "ARCcaller", state, "ARC003")
