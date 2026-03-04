@@ -36,6 +36,19 @@ python -m src.p2p.node --host 127.0.0.1 --port 5002
 python -m src.p2p.node --host 127.0.0.1 --port 5003
 ```
 
+## API Routes
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| POST | `/transaction` | Submit a signed transaction |
+| POST | `/block` | Receive a broadcast block |
+| POST | `/peers` | Register a peer node |
+| GET | `/peers` | List known peers |
+| GET | `/chain` | Get the full chain |
+| GET | `/mempool` | Get pending transactions |
+| POST | `/mine` | Mine a block from mempool |
+| POST | `/seed` | Seed an address with balance (demo only) |
+
 ## Run tests
 ```bash
 pytest -v
@@ -148,45 +161,35 @@ Handled by `src/contracts/`:
 
 ## Demonstration
 
-### 1. Create wallets
-```python
-from src.wallet import Wallet
-alice = Wallet.generate()
-bob = Wallet.generate()
-print(alice.address)  # ARC...
-```
+## Demonstration
 
-### 2. Send a signed transaction
-```python
-from src.core.transaction import Transaction
-tx = Transaction(
-    sender=alice.address,
-    recipient=bob.address,
-    amount=10.0,
-    nonce=0,
-    sender_public_key=alice.private_key.public_key()
-)
-tx.signature = alice.sign(tx.hash())
-```
-
-### 3. Submit to a node
+Run `demo.py` at the root of the project. It automates the full flow:
 ```bash
-curl -X POST http://127.0.0.1:5001/transaction \
-  -H "Content-Type: application/json" \
-  -d '{"sender": "ARC...", "recipient": "ARC...", "amount": 10.0, ...}'
+python demo.py
 ```
 
-### 4. Deploy and call a contract
-```python
-from src.contracts.engine import ContractEngine
-engine = ContractEngine()
-engine.deploy("ARC001", "escrow")
-engine.call("ARC001", "deposit", {"amount": 100}, alice.address)
-engine.call("ARC001", "release", {"recipient": bob.address}, alice.address)
+This script:
+1. Registers all 3 nodes as peers of each other
+2. Creates two wallets — Alice and Bob
+3. Seeds Alice with 100 ARC on all nodes
+4. Creates a signed transaction from Alice to Bob for 10 ARC
+5. Submits it to node 1
+
+Then mine the transaction into a block on node 1:
+```bash
+# PowerShell
+Invoke-RestMethod -Method POST -Uri "http://127.0.0.1:5001/mine"
+
+# bash/curl
+curl -X POST http://127.0.0.1:5001/mine
 ```
 
-### 5. Verify state
-```python
-print(engine.get_state("ARC001"))
-# {"amount": 100, "sender": "ARC...", "status": "released", "recipient": "ARC..."}
+Then verify all 3 nodes are in sync:
+```bash
+# PowerShell
+Invoke-RestMethod -Method GET -Uri "http://127.0.0.1:5001/chain"
+Invoke-RestMethod -Method GET -Uri "http://127.0.0.1:5002/chain"
+Invoke-RestMethod -Method GET -Uri "http://127.0.0.1:5003/chain"
 ```
+
+All 3 nodes should show `length: 1` with the same block.
