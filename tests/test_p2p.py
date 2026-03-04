@@ -168,3 +168,37 @@ def test_sync_resolve_longer_chain():
     with patch.object(sync, "fetch_chain", return_value=remote_chain.to_dict()):
         result = sync.resolve(["http://127.0.0.1:5001"])
     assert result is True
+
+def test_broadcast_send_tx_connection_error():
+    from src.core.transaction import Transaction
+    from src.crypto import keys
+    broadcast = Broadcast()
+    private_key = keys.generate_private_key()
+    address = keys.derive_address(keys.derive_public_key(private_key))
+    tx = Transaction(
+        sender=address,
+        recipient="ARCbob",
+        amount=10.0,
+        nonce=0,
+        sender_public_key=private_key.public_key()
+    )
+    with patch("requests.post", side_effect=requests.exceptions.ConnectionError):
+        broadcast.send_tx(tx, ["http://127.0.0.1:5001"])
+
+
+def test_sync_fetch_chain_non_200():
+    chain = Chain()
+    sync = Sync(chain)
+    mock_response = MagicMock()
+    mock_response.status_code = 404
+    with patch("requests.get", return_value=mock_response):
+        result = sync.fetch_chain("http://127.0.0.1:5001")
+    assert result is None
+
+
+def test_sync_resolve_fetch_returns_none():
+    chain = Chain()
+    sync = Sync(chain)
+    with patch.object(sync, "fetch_chain", return_value=None):
+        result = sync.resolve(["http://127.0.0.1:5001"])
+    assert result is False
