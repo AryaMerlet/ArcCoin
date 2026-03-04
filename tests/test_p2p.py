@@ -314,3 +314,67 @@ def test_node_start(client):
         with patch.object(node.sync, "resolve"):
             node.start()
             assert mock_run.called
+
+def test_get_mempool_empty(client):
+    app_client, node = client
+    response = app_client.get("/mempool")
+    assert response.status_code == 200
+    assert response.get_json()["pending"] == []
+
+
+def test_seed_balance(client):
+    app_client, node = client
+    response = app_client.post("/seed", json={"address": "ARCalice", "amount": 50.0})
+    assert response.status_code == 200
+    assert node.chain.state.get_balance("ARCalice") == 50.0
+
+
+def test_mine_no_transactions(client):
+    app_client, node = client
+    response = app_client.post("/mine")
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "no transactions to mine"
+
+
+def test_mine_with_transaction(client):
+    app_client, node = client
+    private_key = keys.generate_private_key()
+    public_key = keys.derive_public_key(private_key)
+    address = keys.derive_address(public_key)
+    node.chain.state.balances[address] = 100.0
+    from src.core.transaction import Transaction
+    tx = Transaction(
+        sender=address,
+        recipient="ARCbob",
+        amount=10.0,
+        nonce=0,
+        sender_public_key=private_key.public_key()
+    )
+    tx.signature = signatures.sign(private_key, tx.hash())
+    node.chain.mempool.add(tx)
+    with patch("src.p2p.node.Broadcast.send_block"):
+        response = app_client.post("/mine")
+    assert response.status_code == 200
+    assert node.chain.length() == 1
+    assert node.chain.state.get_balance(address) == 90.0
+    assert node.chain.state.get_balance("ARCbob") == 10.0
+
+
+def test_get_mempool_with_transaction(client):
+    app_client, node = client
+    private_key = keys.generate_private_key()
+    address = keys.derive_address(keys.derive_public_key(private_key))
+    node.chain.state.balances[address] = 100.0
+    from src.core.transaction import Transaction
+    tx = Transaction(
+        sender=address,
+        recipient="ARCbob",
+        amount=10.0,
+        nonce=0,
+        sender_public_key=private_key.public_key()
+    )
+    tx.signature = signatures.sign(private_key, tx.hash())
+    node.chain.mempool.add(tx)
+    response = app_client.get("/mempool")
+    assert response.status_code == 200
+    assert len(response.get_json()["pending"]) == 1

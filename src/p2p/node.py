@@ -100,7 +100,7 @@ class Node:
         self.sync.resolve(self.peers.all())
         self.app.run(host=self.host, port=self.port)
 
-if __name__ == "__main__":
+if __name__ == "__main__": # pragma: no cover
     import argparse
     parser = argparse.ArgumentParser(description="ArcCoin Node")
     parser.add_argument("--host", type=str, default="127.0.0.1")
