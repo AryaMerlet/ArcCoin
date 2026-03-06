@@ -2,3 +2,9 @@ flask
 cryptography
 pytest
 requests
+flask
+flask-cors
+cryptography
+pytest
+pytest-cov
+requests

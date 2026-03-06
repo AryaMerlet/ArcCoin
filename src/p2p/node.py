@@ -7,6 +7,8 @@ from src.p2p.broadcast import Broadcast
 from src.p2p.sync import Sync
 from src.core.block import Block
 from src.crypto.keys import public_key_from_bytes
+from flask_cors import CORS
+import os
 
 class Node:
     def __init__(self, host: str, port: int):
@@ -17,6 +19,9 @@ class Node:
         self.broadcast = Broadcast()
         self.sync = Sync(self.chain)
         self.app = Flask(__name__)
+        CORS(self.app, resources={r"/*": {"origins": "*"}})
+        dashboard_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'dashboard')
+        self.app = Flask(__name__, static_folder=dashboard_path, static_url_path='')
         self._register_routes()
 
     def _register_routes(self):
@@ -72,6 +77,47 @@ class Node:
         def get_mempool():
             return jsonify({"pending": [tx.to_dict() for tx in self.chain.mempool.pending]}), 200
 
+        @self.app.route("/wallet/generate", methods=["POST"])
+        def generate_wallet():
+            from src.wallet import Wallet
+            from cryptography.hazmat.primitives import serialization
+            w = Wallet.generate()
+            private_key_hex = w.private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption()
+            ).decode("utf-8")
+            return jsonify({
+                "address": w.address,
+                "private_key_hex": private_key_hex
+            }), 200
+
+        @self.app.route("/wallet/send", methods=["POST"])
+        def wallet_send():
+            from src.wallet import Wallet
+            from cryptography.hazmat.primitives.serialization import load_pem_private_key
+            from src.core.transaction import Transaction
+            data = request.get_json()
+            private_key = load_pem_private_key(
+                data["private_key_hex"].encode("utf-8"),
+                password=None
+            )
+            w = Wallet(private_key)
+            nonce = self.chain.state.get_nonce(w.address)
+            tx = Transaction(
+                sender=w.address,
+                recipient=data["recipient"],
+                amount=float(data["amount"]),
+                nonce=nonce,
+                sender_public_key=private_key.public_key()
+            )
+            tx.signature = w.sign(tx.hash())
+            if not Validator.validate_transaction(tx, self.chain.state):
+                return jsonify({"error": "invalid transaction"}), 400
+            self.chain.add_transaction(tx)
+            self.broadcast.send_tx(tx, self.peers.all())
+            return jsonify({"status": "ok"}), 200
+
         @self.app.route("/mine", methods=["POST"])
         def mine():
             txs = self.chain.mempool.get_valid_txs()
@@ -95,6 +141,34 @@ class Node:
             self.chain.add_block(block)
             self.broadcast.send_block(block, self.peers.all())
             return jsonify({"status": "mined", "block": block.to_dict()}), 200
+
+        @self.app.route("/")
+        def dashboard():
+            return self.app.send_static_file("index.html")
+
+        @self.app.after_request
+        def add_cors_headers(response):
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+            return response
+
+        @self.app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
+        @self.app.route('/<path:path>', methods=['OPTIONS'])
+        def handle_options(path):
+            from flask import Response
+            return Response(status=200, headers={
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            })
+
+        @self.app.route("/balance/<address>", methods=["GET"])
+        def get_balance(address):
+            return jsonify({
+                "address": address,
+                "balance": self.chain.state.get_balance(address)
+            }), 200
 
     def start(self):
         self.sync.resolve(self.peers.all())
