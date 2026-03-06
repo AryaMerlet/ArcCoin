@@ -12,11 +12,13 @@ Ticker: **ARC**
 src/
 ├── crypto/         # hash.py, keys.py, signatures.py
 ├── core/           # transaction.py, block_header.py, block.py
-│                   # chain.py, mempool.py, state.py, validator.py
+│                   # chain.py, mempool.py, state.py, validator.py, miner.py
 ├── contracts/      # engine.py, state.py, execution.py
 └── p2p/            # node.py, peers.py, broadcast.py, sync.py
-tests/              # unit tests and network scenarios
+dashboard/          # index.html — web dashboard
+tests/              # unit tests
 wallet.py           # client-side key and signing management
+demo.py             # automated 3-node demonstration script
 ```
 
 ## Setup
@@ -35,6 +37,34 @@ python -m src.p2p.node --host 127.0.0.1 --port 5001
 python -m src.p2p.node --host 127.0.0.1 --port 5002
 python -m src.p2p.node --host 127.0.0.1 --port 5003
 ```
+
+## Dashboard
+
+Each node serves a web dashboard at its root URL:
+```
+http://127.0.0.1:5001
+http://127.0.0.1:5002
+http://127.0.0.1:5003
+```
+
+Features:
+- Real-time chain explorer — blocks, transactions, nonce
+- Mempool viewer
+- Wallet generation and balance tracking
+- Send signed transactions between nodes
+- Mine blocks directly from the UI
+- Peer management
+- Activity log
+- Node switcher — each node has its own wallet
+
+## Mining
+
+Mining is handled by `src/core/miner.py` following the Single Responsibility Principle:
+
+- `Miner.create_block()` — builds a block from pending transactions
+- `Miner.mine()` — brute-force nonce search until hash starts with `difficulty` leading zeros
+
+The mechanism is identical to Bitcoin — SHA256, nonce increment, longest chain rule. Difficulty is set to `2` for demo purposes (hash must start with `"00"`).
 
 ## API Routes
 
@@ -161,35 +191,33 @@ Handled by `src/contracts/`:
 
 ## Demonstration
 
-## Demonstration
-
-Run `demo.py` at the root of the project. It automates the full flow:
+### Automated demo script
 ```bash
 python demo.py
 ```
 
-This script:
-1. Registers all 3 nodes as peers of each other
-2. Creates two wallets — Alice and Bob
-3. Seeds Alice with 100 ARC on all nodes
-4. Creates a signed transaction from Alice to Bob for 10 ARC
-5. Submits it to node 1
+This script registers all 3 nodes as peers, creates two wallets, seeds Alice with 100 ARC on all nodes, and sends a signed transaction from Alice to Bob.
 
-Then mine the transaction into a block on node 1:
-```bash
-# PowerShell
-Invoke-RestMethod -Method POST -Uri "http://127.0.0.1:5001/mine"
+### Manual demo via Dashboard
 
-# bash/curl
-curl -X POST http://127.0.0.1:5001/mine
-```
+1. Open `http://127.0.0.1:5001` in your browser
+2. Click **Generate New Wallet** — this creates a wallet for node 1
+3. Click **Seed My Wallet** — gives your wallet 100 ARC
+4. Switch to `127.0.0.1:5002` in the node selector
+5. Click **Generate New Wallet** — this creates a separate wallet for node 2
+6. Copy node 2's address from the wallet card
+7. Switch back to `127.0.0.1:5001`
+8. Paste node 2's address in the **Recipient Address** field
+9. Enter an amount and click **Send →**
+10. Click **⛏ Mine Block** to confirm the transaction
+11. Switch to `127.0.0.1:5002` and `127.0.0.1:5003` — both should show chain length 1
+12. Node 2's balance updates to reflect the received ARC
 
-Then verify all 3 nodes are in sync:
-```bash
-# PowerShell
-Invoke-RestMethod -Method GET -Uri "http://127.0.0.1:5001/chain"
-Invoke-RestMethod -Method GET -Uri "http://127.0.0.1:5002/chain"
-Invoke-RestMethod -Method GET -Uri "http://127.0.0.1:5003/chain"
-```
-
-All 3 nodes should show `length: 1` with the same block.
+### What this demonstrates
+- Wallet generation with SECP256K1 keys and ARC addresses
+- Client-side transaction signing with ECDSA
+- Transaction broadcast propagation across all 3 nodes via P2P
+- Proof of Work mining with nonce search
+- Block propagation to all peers
+- State update — balances reflect confirmed transactions
+- Fork resolution — longest valid chain wins
