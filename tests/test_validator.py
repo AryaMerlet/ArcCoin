@@ -1,4 +1,6 @@
 import pytest
+
+from src.core.miner import Miner
 from src.core.validator import Validator
 from src.core.transaction import Transaction
 from src.core.block import Block
@@ -65,34 +67,40 @@ def test_validate_transaction_wrong_nonce():
 def test_validate_block_no_prev():
     header = BlockHeader(index=0, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=1)
     block = Block(header, [])
-    block.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block)
     assert Validator.validate_block(block, None) is True
 
 
 def test_validate_block_valid():
     header1 = BlockHeader(index=0, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=1)
     block1 = Block(header1, [])
-    block1.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block1)
     header2 = BlockHeader(index=1, prev_hash=block1.header.hash(), merkle_root="0" * 64, difficulty=1)
     block2 = Block(header2, [])
-    block2.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block2)
     assert Validator.validate_block(block2, block1) is True
 
 
 def test_validate_block_wrong_prev_hash():
     header1 = BlockHeader(index=0, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=1)
     block1 = Block(header1, [])
-    block1.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block1)
     header2 = BlockHeader(index=1, prev_hash="wronghash", merkle_root="0" * 64, difficulty=1)
     block2 = Block(header2, [])
-    block2.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block2)
     assert Validator.validate_block(block2, block1) is False
 
 
 def test_validate_block_invalid_pow():
     header1 = BlockHeader(index=0, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=1)
     block1 = Block(header1, [])
-    block1.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block1)
     header2 = BlockHeader(index=1, prev_hash=block1.header.hash(), merkle_root="0" * 64, difficulty=4)
     block2 = Block(header2, [])
     # intentionally not mining
@@ -103,7 +111,8 @@ def test_validate_chain_valid():
     chain = Chain()
     header = BlockHeader(index=0, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=1)
     block = Block(header, [])
-    block.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block)
     chain.add_block(block)
     assert Validator.validate_chain(chain) is True
 
@@ -114,11 +123,13 @@ def test_select_chain_picks_longest():
     for i in range(3):
         header = BlockHeader(index=i, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=1)
         block = Block(header, [])
-        block.mine()
+        miner = Miner(difficulty=1)
+        miner.mine(block)
         chain_a.add_block(block)
     header = BlockHeader(index=0, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=1)
     block = Block(header, [])
-    block.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block)
     chain_b.add_block(block)
     assert Validator.select_chain(chain_a, chain_b) == chain_a
 
@@ -129,14 +140,16 @@ def test_select_chain_picks_remote_if_longer():
 
     header = BlockHeader(index=0, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=1)
     block = Block(header, [])
-    block.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block)
     chain_a.add_block(block)
 
     prev_hash = "0" * 64
     for i in range(3):
         header = BlockHeader(index=i, prev_hash=prev_hash, merkle_root="0" * 64, difficulty=1)
         block = Block(header, [])
-        block.mine()
+        miner = Miner(difficulty=1)
+        miner.mine(block)
         prev_hash = block.header.hash()
         chain_b.add_block(block)
 
@@ -163,13 +176,15 @@ def test_validate_chain_invalid():
             chain = Chain()
             header1 = BlockHeader(index=0, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=1)
             block1 = Block(header1, [])
-            block1.mine()
+            miner = Miner(difficulty=1)
+            miner.mine(block1)
             chain.add_block(block1)
 
             # second block with wrong prev_hash
             header2 = BlockHeader(index=1, prev_hash="wronghash", merkle_root="0" * 64, difficulty=1)
             block2 = Block(header2, [])
-            block2.mine()
+            miner = Miner(difficulty=1)
+            miner.mine(block1)
             chain.add_block(block2)
 
             assert Validator.validate_chain(chain) is False

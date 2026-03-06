@@ -8,11 +8,6 @@ class Block:
         self.header = header
         self.transactions = transactions
 
-    def mine(self) -> None:
-        target = "0" * self.header.difficulty
-        while not self.header.hash().startswith(target):
-            self.header.nonce += 1
-
     def to_dict(self) -> dict:
         return {
             "header": self.header.to_dict(),

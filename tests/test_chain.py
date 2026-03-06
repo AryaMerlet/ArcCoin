@@ -1,6 +1,7 @@
 from src.core.chain import Chain
 from src.core.block import Block
 from src.core.block_header import BlockHeader
+from src.core.miner import Miner
 from src.core.transaction import Transaction
 from src.core.validator import Validator
 from src.crypto import keys, signatures
@@ -10,7 +11,8 @@ def test_add_block():
     chain = Chain()
     header = BlockHeader(index=0, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=2)
     block = Block(header, [])
-    block.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block)
     assert chain.add_block(block) is True
     assert chain.length() == 1
 
@@ -19,7 +21,8 @@ def test_chain_validation():
     chain = Chain()
     header = BlockHeader(index=0, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=2)
     block = Block(header, [])
-    block.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block)
     chain.add_block(block)
     assert Validator.validate_chain(chain) is True
 
@@ -31,12 +34,14 @@ def test_select_longest_chain():
     for i in range(2):
         header = BlockHeader(index=i, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=1)
         block = Block(header, [])
-        block.mine()
+        miner = Miner(difficulty=1)
+        miner.mine(block)
         chain_a.add_block(block)
 
     header = BlockHeader(index=0, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=1)
     block = Block(header, [])
-    block.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block)
     chain_b.add_block(block)
 
     result = Validator.select_chain(chain_a, chain_b)
@@ -62,7 +67,8 @@ def test_state_updates_after_block():
 
     header = BlockHeader(index=0, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=1)
     block = Block(header, [tx])
-    block.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block)
     chain.add_block(block)
 
     assert chain.state.get_balance(sender) == 90.0
@@ -71,7 +77,8 @@ def test_state_updates_after_block():
 def make_block(index, prev_hash, difficulty=1):
     header = BlockHeader(index=index, prev_hash=prev_hash, merkle_root="0" * 64, difficulty=difficulty)
     block = Block(header, [])
-    block.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block)
     return block
 
 

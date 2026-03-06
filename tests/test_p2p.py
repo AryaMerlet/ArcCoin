@@ -1,6 +1,8 @@
 import requests
 import pytest
 from unittest.mock import patch, MagicMock
+
+from src.core.miner import Miner
 from src.p2p.peers import Peers
 from src.p2p.broadcast import Broadcast
 from src.p2p.sync import Sync
@@ -56,7 +58,8 @@ def test_peers_discover_connection_error():
 def make_block():
     header = BlockHeader(index=0, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=1)
     block = Block(header, [])
-    block.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block)
     return block
 
 
@@ -165,7 +168,8 @@ def test_sync_resolve_longer_chain():
     for i in range(2):
         header = BlockHeader(index=i, prev_hash=prev_hash, merkle_root="0" * 64, difficulty=1)
         block = Block(header, [])
-        block.mine()
+        miner = Miner(difficulty=1)
+        miner.mine(block)
         prev_hash = block.header.hash()
         remote_chain.add_block(block)
 
@@ -288,7 +292,8 @@ def test_post_valid_block(client):
     app_client, node = client
     header = BlockHeader(index=0, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=1)
     block = Block(header, [])
-    block.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block)
     with patch("src.p2p.node.Broadcast.send_block"):
         response = app_client.post("/block", json=block.to_dict())
     assert response.status_code == 200
@@ -299,12 +304,14 @@ def test_post_invalid_block(client):
     # add a first valid block
     header1 = BlockHeader(index=0, prev_hash="0" * 64, merkle_root="0" * 64, difficulty=1)
     block1 = Block(header1, [])
-    block1.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block1)
     node.chain.add_block(block1)
     # second block with wrong prev_hash
     header2 = BlockHeader(index=1, prev_hash="wronghash", merkle_root="0" * 64, difficulty=1)
     block2 = Block(header2, [])
-    block2.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block2)
     response = app_client.post("/block", json=block2.to_dict())
     assert response.status_code == 400
 
@@ -378,3 +385,63 @@ def test_get_mempool_with_transaction(client):
     response = app_client.get("/mempool")
     assert response.status_code == 200
     assert len(response.get_json()["pending"]) == 1
+def test_wallet_generate(client):
+    app_client, node = client
+    response = app_client.post("/wallet/generate")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert "address" in data
+    assert data["address"].startswith("ARC")
+    assert "private_key_hex" in data
+
+
+def test_wallet_send(client):
+    app_client, node = client
+    response = app_client.post("/wallet/generate")
+    w = response.get_json()
+    node.chain.state.balances[w["address"]] = 100.0
+    with patch("src.p2p.node.Broadcast.send_tx"):
+        response = app_client.post("/wallet/send", json={
+            "private_key_hex": w["private_key_hex"],
+            "recipient": "ARCbob",
+            "amount": 10.0
+        })
+    assert response.status_code == 200
+
+
+def test_wallet_send_insufficient_balance(client):
+    app_client, node = client
+    response = app_client.post("/wallet/generate")
+    w = response.get_json()
+    response = app_client.post("/wallet/send", json={
+        "private_key_hex": w["private_key_hex"],
+        "recipient": "ARCbob",
+        "amount": 10.0
+    })
+    assert response.status_code == 400
+
+
+def test_get_balance(client):
+    app_client, node = client
+    node.chain.state.balances["ARCalice"] = 50.0
+    response = app_client.get("/balance/ARCalice")
+    assert response.status_code == 200
+    assert response.get_json()["balance"] == 50.0
+
+
+def test_cors_options(client):
+    app_client, node = client
+    response = app_client.options("/chain")
+    assert response.status_code == 200
+
+def test_dashboard_route(client):
+    app_client, node = client
+    response = app_client.get("/")
+    assert response.status_code == 200
+
+
+def test_options_route(client):
+    app_client, node = client
+    response = app_client.options("/transaction")
+    assert response.status_code == 200
+    assert response.headers.get("Access-Control-Allow-Origin") == "*"

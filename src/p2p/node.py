@@ -1,14 +1,16 @@
-from flask import Flask, request, jsonify
 from src.core.chain import Chain
 from src.core.transaction import Transaction
 from src.core.validator import Validator
 from src.p2p.peers import Peers
 from src.p2p.broadcast import Broadcast
 from src.p2p.sync import Sync
-from src.core.block import Block
 from src.crypto.keys import public_key_from_bytes
+from src.core.block import Block
 from flask_cors import CORS
 import os
+from src.core.miner import Miner
+from flask import Flask, request, jsonify, Response
+
 
 class Node:
     def __init__(self, host: str, port: int):
@@ -19,10 +21,12 @@ class Node:
         self.broadcast = Broadcast()
         self.sync = Sync(self.chain)
         self.app = Flask(__name__)
-        CORS(self.app, resources={r"/*": {"origins": "*"}})
-        dashboard_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'dashboard')
+        BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        dashboard_path = os.path.join(BASE_DIR, 'dashboard')
         self.app = Flask(__name__, static_folder=dashboard_path, static_url_path='')
+        CORS(self.app, resources={r"/*": {"origins": "*"}})
         self._register_routes()
+        self.miner = Miner(difficulty=2)
 
     def _register_routes(self):
         @self.app.route("/transaction", methods=["POST"])
@@ -123,21 +127,10 @@ class Node:
             txs = self.chain.mempool.get_valid_txs()
             if not txs:
                 return jsonify({"error": "no transactions to mine"}), 400
-            from src.crypto.hash import merkle_root
-            from src.core.block_header import BlockHeader
-            from src.core.block import Block
             prev = self.chain.latest()
             prev_hash = prev.header.hash() if prev else "0" * 64
-            index = self.chain.length()
-            m_root = merkle_root([tx.hash() for tx in txs])
-            header = BlockHeader(
-                index=index,
-                prev_hash=prev_hash,
-                merkle_root=m_root,
-                difficulty=2
-            )
-            block = Block(header, txs)
-            block.mine()
+            block = self.miner.create_block(self.chain.length(), prev_hash, txs)
+            self.miner.mine(block)
             self.chain.add_block(block)
             self.broadcast.send_block(block, self.peers.all())
             return jsonify({"status": "mined", "block": block.to_dict()}), 200
@@ -156,7 +149,6 @@ class Node:
         @self.app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
         @self.app.route('/<path:path>', methods=['OPTIONS'])
         def handle_options(path):
-            from flask import Response
             return Response(status=200, headers={
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',

@@ -3,6 +3,7 @@ from src.core.chain import Chain
 from src.core.state import State
 from src.core.transaction import Transaction
 from src.crypto.signatures import verify
+from src.core.miner import Miner
 
 
 class Validator:

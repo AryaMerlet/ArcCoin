@@ -1,3 +1,4 @@
+from src.core.miner import Miner
 from src.crypto import keys, signatures
 from src.core.transaction import Transaction
 from src.core.block_header import BlockHeader
@@ -13,7 +14,8 @@ def test_block_mining():
         difficulty=2
     )
     block = Block(header, [])
-    block.mine()
+    miner = Miner(difficulty=2)
+    miner.mine(block)
     assert block.header.hash().startswith("00")
 
 
@@ -38,7 +40,8 @@ def test_block_from_dict():
         difficulty=2
     )
     block = Block(header, [])
-    block.mine()
+    miner = Miner(difficulty=1)
+    miner.mine(block)
     d = block.to_dict()
     restored = Block.from_dict(d)
     assert restored.header.index == 1
